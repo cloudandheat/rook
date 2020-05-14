@@ -107,6 +107,7 @@ func testPodDevices(t *testing.T, dataDir, deviceName string, allDevices bool) {
 	}
 
 	osdProp := osdProperties{
+		crushRoot:     "default",
 		crushHostname: n.Name,
 		selection:     n.Selection,
 		resources:     v1.ResourceRequirements{},
@@ -283,6 +284,7 @@ func TestStorageSpecConfig(t *testing.T) {
 	metadataDevice := config.MetadataDevice(spec.Storage.Nodes[0].Config)
 
 	osdProp := osdProperties{
+		crushRoot:      "crush-root",
 		crushHostname:  n.Name,
 		devices:        n.Devices,
 		selection:      n.Selection,
@@ -306,6 +308,7 @@ func TestStorageSpecConfig(t *testing.T) {
 	verifyEnvVar(t, container.Env, "ROOK_OSD_DATABASE_SIZE", "10", true)
 	verifyEnvVar(t, container.Env, "ROOK_OSD_WAL_SIZE", "20", true)
 	verifyEnvVar(t, container.Env, "ROOK_METADATA_DEVICE", "nvme093", true)
+	verifyEnvVar(t, container.Env, RookCrushmapRootEnv, "crush-root", true)
 }
 
 func TestHostNetwork(t *testing.T) {
@@ -339,6 +342,7 @@ func TestHostNetwork(t *testing.T) {
 	}
 
 	osdProp := osdProperties{
+		crushRoot:     "default",
 		crushHostname: n.Name,
 		devices:       n.Devices,
 		selection:     n.Selection,

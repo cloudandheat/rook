@@ -1965,6 +1965,11 @@ func (m *CephManifestsMaster) GetRookCluster(settings *clusterSettings) string {
 		store = `storeType: "` + settings.StoreType + `"`
 	}
 
+	crushRoot := "# crushRoot not specified; Rook will use `default`"
+	if settings.Mons == 1 {
+		crushRoot = `crushRoot: "custom-root"`
+	}
+
 	if settings.UsePVCs {
 		return `apiVersion: ceph.rook.io/v1
 kind: CephCluster
@@ -1995,6 +2000,8 @@ spec:
   crashCollector:
     disable: false
   storage:
+    config:
+      ` + crushRoot + `
     storageClassDeviceSets:
     - name: set1
       count: 1

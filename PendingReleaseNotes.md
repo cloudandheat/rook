@@ -30,6 +30,7 @@
   - The endpoint is now displayed in the Status field
 - Prometheus monitoring for external clusters is now possible, refer to the [external cluster section](Documentation/ceph-cluster-crd.html#external-cluster)
 - The operator will check for the presence of the `lvm2` package on the host where OSDs will run. If not available, the prepare job will fail. This will prevent issues of OSDs not restarting on node reboot.
+- CephCluster CRD now supports setting the CRUSH map root, see [ceph-cluster crd](Documentation/ceph-cluster-crd.html).
 
 ### EdgeFS
 

@@ -19,9 +19,11 @@ package cluster
 
 import (
 	"fmt"
+	"os/exec"
 	"path"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/pkg/errors"
 
@@ -42,7 +44,9 @@ import (
 )
 
 const (
-	detectVersionName = "rook-ceph-detect-version"
+	detectVersionName  = "rook-ceph-detect-version"
+	crushRootConfigKey = "crushRoot"
+	crushRootDefault   = "default"
 )
 
 type cluster struct {
@@ -68,6 +72,16 @@ type cluster struct {
 type clusterHealth struct {
 	stopChan          chan struct{}
 	monitoringRunning bool
+}
+
+func getCrushRootFromSpec(c *cephv1.ClusterSpec) string {
+	if c.Storage.Config == nil {
+		return crushRootDefault
+	}
+	if v, ok := c.Storage.Config[crushRootConfigKey]; ok {
+		return v
+	}
+	return crushRootDefault
 }
 
 func newCluster(c *cephv1.CephCluster, context *clusterd.Context, csiMutex *sync.Mutex, ownerRef *metav1.OwnerReference) *cluster {
@@ -367,6 +381,86 @@ func (c *ClusterController) preClusterStartValidation(cluster *cluster, clusterO
 	return nil
 }
 
+func extractExitCode(err error) (int, bool) {
+	exitErr, ok := err.(*exec.ExitError)
+	if ok {
+		return exitErr.ExitCode(), true
+	}
+	return 0, false
+}
+
+func (c *cluster) removeDefaultReplicationRule() error {
+	args := []string{"osd", "crush", "rule", "rm", "replicated_rule"}
+	cephCmd := client.NewCephCommand(c.context, c.Namespace, args)
+	_, err := cephCmd.Run()
+	if err != nil {
+		if code, ok := extractExitCode(err); ok && code == int(syscall.EBUSY) {
+			// we do not want to delete the replicated_rule if it’s in use,
+			// and we also do not care much. There are two possible causes:
+			// - the user has created this rule with the non-default CRUSH
+			//   root manually
+			// - the user is using this rule despite the rule using the default
+			//   CRUSH root
+			// in both cases, we cannot do anything about it either way and
+			// we’ll assume that the user knows what they’re doing.
+			logger.Warning("replicated_rule is in use, not removed")
+			return nil
+		}
+		// the error does not refer to EBUSY -> return as error
+		return errors.Wrap(err, "failed to remove default replicated_rule")
+	}
+	return nil
+}
+
+func (c *cluster) removeDefaultCrushRoot() error {
+	args := []string{"osd", "crush", "rm", "default"}
+	cephCmd := client.NewCephCommand(c.context, c.Namespace, args)
+	_, err := cephCmd.Run()
+	if err != nil {
+		if code, ok := extractExitCode(err); ok {
+			if code == int(syscall.ENOTEMPTY) || code == int(syscall.EBUSY) {
+				// we do not want to delete the default node if it’s in use,
+				// and we also do not care much. There are two more causes here:
+				// - a (non-root?) CRUSH node with the default label was created
+				//   automatically, e.g. from topology labels, and OSDs (or sub
+				//   nodes) have been placed in there. In this case, the node
+				//   obviously needs to be preserved.
+				// - the root=default CRUSH node is in use by a non-default
+				//   CRUSH rule
+				// - OSDs or subnodes have been placed under the root=default
+				//   CRUSH node
+				//
+				// in all cases, we cannot do anything about it either way and
+				// we’ll assume that the user knows what they’re doing.
+				logger.Debug("default is not empty or is still in use, not removed")
+				return nil
+			}
+		}
+		// the error does not refer to EBUSY or ENOTEMPTY -> return as error
+		return errors.Wrap(err, "failed to remove CRUSH node 'default'")
+	}
+	return nil
+}
+
+// Remove the default root=default and replicated_rule CRUSH objects which are created by Ceph on initial startup.
+// Those objects may interfere with the normal operation of the cluster.
+// Note that errors which indicate that the objects are in use are ignored and the objects will continue to exist in that case.
+func (c *cluster) removeDefaultCrushMap() (err error) {
+	logger.Info("removing default replicated_rule CRUSH rule for use of non-default CRUSH root")
+	err = c.removeDefaultReplicationRule()
+	if err != nil {
+		return errors.Wrap(err, "failed to remove default rule")
+	}
+
+	logger.Info("removing default CRUSH node if applicable")
+	err = c.removeDefaultCrushRoot()
+	if err != nil {
+		return errors.Wrap(err, "failed to remove default CRUSH root")
+	}
+
+	return nil
+}
+
 // postMonStartupActions is a collection of actions to run once the monitors are up and running
 // It gets executed right after the main mon Start() method
 // Basically, it is executed between the monitors and the manager sequence
@@ -386,6 +480,15 @@ func (c *cluster) postMonStartupActions() error {
 	// Enable Ceph messenger 2 protocol on Nautilus
 	if err := client.EnableMessenger2(c.context, c.ClusterInfo); err != nil {
 		return errors.Wrap(err, "failed to enable Ceph messenger version 2")
+	}
+
+	if getCrushRootFromSpec(c.Spec) != "default" {
+		// Remove the root=default and replicated_rule which are created by
+		// default. Note that RemoveDefaultCrushMap ignores some types of errors
+		// internally
+		if err := c.removeDefaultCrushMap(); err != nil {
+			return errors.Wrap(err, "failed to remove default CRUSH map")
+		}
 	}
 
 	return nil
