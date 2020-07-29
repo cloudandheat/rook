@@ -406,9 +406,17 @@ func TestGetOSDInfo(t *testing.T) {
 }
 
 func TestGetOSDInfoWithCustomRoot(t *testing.T) {
-	c := New(&cephconfig.ClusterInfo{}, &clusterd.Context{}, "ns", "myversion", cephv1.CephVersionSpec{},
-		rookv1.StorageScopeSpec{}, "", rookv1.Placement{}, rookv1.Annotations{}, cephv1.NetworkSpec{},
-		v1.ResourceRequirements{}, v1.ResourceRequirements{}, "my-priority-class", metav1.OwnerReference{}, false, false, "custom-root")
+	clusterInfo := &cephclient.ClusterInfo{Namespace: "ns"}
+	context := &clusterd.Context{}
+	spec := cephv1.ClusterSpec{
+		DataDirHostPath: "/rook",
+		Storage: rookv1.StorageScopeSpec{
+			Config: map[string]string{
+				"crushRoot": "custom-root",
+			},
+		},
+	}
+	c := New(context, clusterInfo, spec, "myversion")
 
 	node := "n1"
 	location := "root=custom-root host=myhost zone=myzone"
@@ -424,7 +432,7 @@ func TestGetOSDInfoWithCustomRoot(t *testing.T) {
 		crushRoot:     "custom-root",
 	}
 	dataPathMap := &provisionConfig{
-		DataPathMap: opconfig.NewDatalessDaemonDataPathMap(c.Namespace, c.dataDirHostPath),
+		DataPathMap: opconfig.NewDatalessDaemonDataPathMap(c.clusterInfo.Namespace, c.spec.DataDirHostPath),
 	}
 	d1, _ := c.makeDeployment(osdProp, osd1, dataPathMap)
 	osds1, _ := c.getOSDInfo(d1)

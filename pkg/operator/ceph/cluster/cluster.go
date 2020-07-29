@@ -44,9 +44,7 @@ import (
 )
 
 const (
-	detectVersionName  = "rook-ceph-detect-version"
-	crushRootConfigKey = "crushRoot"
-	crushRootDefault   = "default"
+	detectVersionName = "rook-ceph-detect-version"
 )
 
 type cluster struct {
@@ -72,16 +70,6 @@ type cluster struct {
 type clusterHealth struct {
 	stopChan          chan struct{}
 	monitoringRunning bool
-}
-
-func getCrushRootFromSpec(c *cephv1.ClusterSpec) string {
-	if c.Storage.Config == nil {
-		return crushRootDefault
-	}
-	if v, ok := c.Storage.Config[crushRootConfigKey]; ok {
-		return v
-	}
-	return crushRootDefault
 }
 
 func newCluster(c *cephv1.CephCluster, context *clusterd.Context, csiMutex *sync.Mutex, ownerRef *metav1.OwnerReference) *cluster {
@@ -391,7 +379,7 @@ func extractExitCode(err error) (int, bool) {
 
 func (c *cluster) removeDefaultReplicationRule() error {
 	args := []string{"osd", "crush", "rule", "rm", "replicated_rule"}
-	cephCmd := client.NewCephCommand(c.context, c.Namespace, args)
+	cephCmd := client.NewCephCommand(c.context, c.ClusterInfo, args)
 	_, err := cephCmd.Run()
 	if err != nil {
 		if code, ok := extractExitCode(err); ok && code == int(syscall.EBUSY) {
@@ -414,7 +402,7 @@ func (c *cluster) removeDefaultReplicationRule() error {
 
 func (c *cluster) removeDefaultCrushRoot() error {
 	args := []string{"osd", "crush", "rm", "default"}
-	cephCmd := client.NewCephCommand(c.context, c.Namespace, args)
+	cephCmd := client.NewCephCommand(c.context, c.ClusterInfo, args)
 	_, err := cephCmd.Run()
 	if err != nil {
 		if code, ok := extractExitCode(err); ok {
@@ -482,7 +470,7 @@ func (c *cluster) postMonStartupActions() error {
 		return errors.Wrap(err, "failed to enable Ceph messenger version 2")
 	}
 
-	if getCrushRootFromSpec(c.Spec) != "default" {
+	if config.GetCrushRootFromSpec(c.Spec) != "default" {
 		// Remove the root=default and replicated_rule which are created by
 		// default. Note that RemoveDefaultCrushMap ignores some types of errors
 		// internally

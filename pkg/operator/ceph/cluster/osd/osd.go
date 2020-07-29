@@ -226,7 +226,7 @@ func (c *Cluster) startProvisioningOverPVCs(config *provisionConfig) {
 		}
 
 		osdProps := osdProperties{
-			crushRoot:        c.crushRoot,
+			crushRoot:        opconfig.GetCrushRootFromSpec(&c.spec),
 			crushHostname:    dataSource.ClaimName,
 			pvc:              dataSource,
 			metadataPVC:      metadataSource,
@@ -363,7 +363,7 @@ func (c *Cluster) startNodeStorageProvisioners(config *provisionConfig) {
 		storeConfig := osdconfig.ToStoreConfig(n.Config)
 		metadataDevice := osdconfig.MetadataDevice(n.Config)
 		osdProps := osdProperties{
-			crushRoot:      c.crushRoot,
+			crushRoot:      opconfig.GetCrushRootFromSpec(&c.spec),
 			crushHostname:  n.Name,
 			devices:        n.Devices,
 			selection:      n.Selection,
@@ -542,7 +542,7 @@ func (c *Cluster) startOSDDaemonsOnNode(nodeName string, config *provisionConfig
 	metadataDevice := osdconfig.MetadataDevice(n.Config)
 
 	osdProps := osdProperties{
-		crushRoot:      c.crushRoot,
+		crushRoot:      opconfig.GetCrushRootFromSpec(&c.spec),
 		crushHostname:  n.Name,
 		devices:        n.Devices,
 		selection:      n.Selection,
@@ -659,7 +659,7 @@ func (c *Cluster) getOSDPropsForPVC(pvcName string) (osdProperties, error) {
 			}
 
 			osdProps := osdProperties{
-				crushRoot:           c.crushRoot,
+				crushRoot:           opconfig.GetCrushRootFromSpec(&c.spec),
 				crushHostname:       dataSource.ClaimName,
 				pvc:                 dataSource,
 				metadataPVC:         metadataSource,
@@ -777,7 +777,7 @@ func (c *Cluster) getOSDInfo(d *apps.Deployment) ([]OSDInfo, error) {
 	}
 
 	if !locationFound {
-		location, err := getLocationFromPod(c.context.Clientset, d, c.crushRoot)
+		location, err := getLocationFromPod(c.context.Clientset, d, opconfig.GetCrushRootFromSpec(&c.spec))
 		if err != nil {
 			logger.Errorf("failed to get location. %v", err)
 		} else {

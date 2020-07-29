@@ -18,7 +18,13 @@ limitations under the License.
 package config
 
 import (
+	cephv1 "github.com/rook/rook/pkg/apis/ceph.rook.io/v1"
 	"github.com/rook/rook/pkg/operator/ceph/version"
+)
+
+const (
+	crushRootConfigKey = "crushRoot"
+	crushRootDefault   = "default"
 )
 
 // DefaultFlags returns the default configuration flags Rook will set on the command line for all
@@ -91,4 +97,14 @@ func DefaultLegacyConfigs() []Option {
 		configOverride("global", "rbd_default_features", "3"),
 	}
 	return overrides
+}
+
+func GetCrushRootFromSpec(c *cephv1.ClusterSpec) string {
+	if c.Storage.Config == nil {
+		return crushRootDefault
+	}
+	if v, ok := c.Storage.Config[crushRootConfigKey]; ok {
+		return v
+	}
+	return crushRootDefault
 }
