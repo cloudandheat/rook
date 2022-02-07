@@ -6,7 +6,7 @@ require (
 	github.com/IBM/keyprotect-go-client v0.7.0
 	github.com/aws/aws-sdk-go v1.37.19
 	github.com/banzaicloud/k8s-objectmatcher v1.1.0
-	github.com/ceph/go-ceph v0.12.0
+	github.com/ceph/go-ceph v0.13.0
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/go-ini/ini v1.51.1
 	github.com/google/go-cmp v0.5.5
@@ -40,6 +40,7 @@ require (
 )
 
 replace (
+	github.com/ceph/go-ceph => /home/sri/progs/go-ceph
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
 	github.com/kubernetes-incubator/external-storage => github.com/libopenstorage/external-storage v0.20.4-openstorage-rc3
 	github.com/portworx/sched-ops => github.com/portworx/sched-ops v0.20.4-openstorage-rc3

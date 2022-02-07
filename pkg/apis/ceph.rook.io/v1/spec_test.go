@@ -94,3 +94,104 @@ storage:
 
 	assert.Equal(t, expectedSpec, clusterSpec)
 }
+
+func newTrue() *bool {
+	t := true
+	return &t
+}
+
+func newFalse() *bool {
+	t := false
+	return &t
+}
+
+func newInt(val int) *int {
+	return &val
+}
+
+func newString(val string) *string {
+	return &val
+}
+
+func TestObjectStoreSpecMarhsalSwiftAndKeystone(t *testing.T) {
+	// Assert that the new ObjectStoreSpec fields specified in <design/ceph/object/swift-and-keystone-integration.md> are correctly parsed
+	specYaml := []byte(`
+auth:
+  keystone:
+    url: https://keystone:5000/
+    acceptedRoles: ["_member_", "service", "admin"]
+    implicitTenants: swift
+    tokenCacheSize: 1000
+    revocationInterval: 1200
+    serviceUserSecretName: rgw-service-user
+protocols:
+  swift:
+    accountInUrl: true
+    urlPrefix: /example
+    versioningEnabled: false
+  s3:
+    enabled: false
+    authUseKeystone: true
+`)
+	rawJSON, err := yaml.ToJSON(specYaml)
+	assert.Nil(t, err)
+	fmt.Printf("rawJSON: %s\n", string(rawJSON))
+
+	// unmarshal the JSON into a strongly typed storage spec object
+	var objectStoreSpec ObjectStoreSpec
+	err = json.Unmarshal(rawJSON, &objectStoreSpec)
+	assert.Nil(t, err)
+
+	// the unmarshalled storage spec should equal the expected spec below
+	expectedSpec := ObjectStoreSpec{
+		Auth: AuthSpec{
+			Keystone: &KeystoneSpec{
+				Url:                   "https://keystone:5000/",
+				AcceptedRoles:         []string{"_member_", "service", "admin"},
+				ImplicitTenants:       "swift",
+				TokenCacheSize:        newInt(1000),
+				RevocationInterval:    newInt(1200),
+				ServiceUserSecretName: "rgw-service-user",
+			},
+		},
+		Protocols: ProtocolSpec{
+			S3: &S3Spec{
+				Enabled:         newFalse(),
+				AuthUseKeystone: newTrue(),
+			},
+			Swift: &SwiftSpec{
+				AccountInUrl:      newTrue(),
+				UrlPrefix:         newString("/example"),
+				VersioningEnabled: newFalse(),
+			},
+		},
+	}
+
+	assert.Equal(t, expectedSpec, objectStoreSpec)
+}
+
+func TestObjectStoreUserSpecMarhsalSubuser(t *testing.T) {
+	// Assert that the new ObjectStoreUserSpec fields specified in <design/ceph/object/swift-and-keystone-integration.md> parse
+	specYaml := []byte(`
+subUsers:
+- name: swift
+  access: full
+`)
+	rawJSON, err := yaml.ToJSON(specYaml)
+	assert.Nil(t, err)
+	fmt.Printf("rawJSON: %s\n", string(rawJSON))
+
+	// unmarshal the JSON into a strongly typed storage spec object
+	var objectStoreUserSpec ObjectStoreUserSpec
+	err = json.Unmarshal(rawJSON, &objectStoreUserSpec)
+	assert.Nil(t, err)
+
+	// the unmarshalled storage spec should equal the expected spec below
+	expectedSpec := ObjectStoreUserSpec{
+		Subusers: []SubuserSpec{
+			{Name: "swift", Access: "full"},
+		},
+	}
+
+	assert.Equal(t, expectedSpec, objectStoreUserSpec)
+}
