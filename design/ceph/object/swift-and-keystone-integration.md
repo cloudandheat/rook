@@ -84,7 +84,7 @@ Annotations:
   `rgw_keystone_token_cache_size`.
 * `[2]` These settings are required in the `keystone` section if
   present.
-* `[1]` The name of the secret containing the credentials for the
+* `[3]` The name of the secret containing the credentials for the
   service user account used by RGW. It has to be in the same namespace
   as the object store resource.
 
@@ -131,7 +131,7 @@ The following constraints must be fulfilled by the secret:
 * All openrc variables not in the example above are ignored. The API
   version (`OS_IDENTITY_API_VERSION`) is assumed to be `3` and
   Keystone endpoint `OS_AUTH_URL` is taken from the
-  `keystone.apiVersion` configuration in the object store resource.
+  `auth.keystone.url` configuration in the object store resource.
 
 The mapping to
 [RGW configuration options](https://docs.ceph.com/en/octopus/radosgw/config-ref/#keystone-settings)

@@ -189,7 +189,7 @@ subUsers:
 	// the unmarshalled storage spec should equal the expected spec below
 	expectedSpec := ObjectStoreUserSpec{
 		Subusers: []SubuserSpec{
-			SubuserSpec{Name: "swift", Access: "full"},
+			{Name: "swift", Access: "full"},
 		},
 	}
 
