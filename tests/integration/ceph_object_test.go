@@ -96,8 +96,32 @@ func (s *ObjectSuite) TestWithTLS() {
 	}
 
 	tls := true
+	swiftAndKeystone := false
 	objectStoreServicePrefix = objectStoreServicePrefixUniq
-	runObjectE2ETest(s.helper, s.k8sh, s.Suite, s.settings.Namespace, tls)
+	runObjectE2ETest(s.helper, s.k8sh, s.Suite, s.settings.Namespace, tls, swiftAndKeystone)
+	cleanUpTLS(s)
+}
+
+func (s *ObjectSuite) TestWithoutTLS() {
+	if utils.IsPlatformOpenShift() {
+		s.T().Skip("object store tests skipped on openshift")
+	}
+
+	tls := false
+	swiftAndKeystone := false
+	objectStoreServicePrefix = objectStoreServicePrefixUniq
+	runObjectE2ETest(s.helper, s.k8sh, s.Suite, s.settings.Namespace, tls, swiftAndKeystone)
+}
+
+func (s *ObjectSuite) TestWithSwiftAndKeystone() {
+	tls := true
+	swiftAndKeystone := true
+	objectStoreServicePrefix = objectStoreServicePrefixUniq
+	runObjectE2ETest(s.helper, s.k8sh, s.Suite, s.settings.Namespace, tls, swiftAndKeystone)
+	cleanUpTLS(s)
+}
+
+func cleanUpTLS(s *ObjectSuite) {
 	err := s.k8sh.Clientset.CoreV1().Secrets(s.settings.Namespace).Delete(context.TODO(), objectTLSSecretName, metav1.DeleteOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -107,28 +131,19 @@ func (s *ObjectSuite) TestWithTLS() {
 	logger.Info("successfully deleted store TLS secret")
 }
 
-func (s *ObjectSuite) TestWithoutTLS() {
-	if utils.IsPlatformOpenShift() {
-		s.T().Skip("object store tests skipped on openshift")
-	}
-
-	tls := false
-	objectStoreServicePrefix = objectStoreServicePrefixUniq
-	runObjectE2ETest(s.helper, s.k8sh, s.Suite, s.settings.Namespace, tls)
-}
 
 // Smoke Test for ObjectStore - Test check the following operations on ObjectStore in order
 // Create object store, Create User, Connect to Object Store, Create Bucket, Read/Write/Delete to bucket,
 // Check issues in MGRs, Delete Bucket and Delete user
 // Test for ObjectStore with and without TLS enabled
-func runObjectE2ETest(helper *clients.TestClient, k8sh *utils.K8sHelper, s suite.Suite, namespace string, tlsEnable bool) {
+func runObjectE2ETest(helper *clients.TestClient, k8sh *utils.K8sHelper, s suite.Suite, namespace string, tlsEnable bool, swiftAndKeystone bool) {
 	storeName := "test-store"
 	if tlsEnable {
 		storeName = objectStoreTLSName
 	}
 
 	logger.Infof("Running on Rook Cluster %s", namespace)
-	createCephObjectStore(s.T(), helper, k8sh, namespace, storeName, 3, tlsEnable)
+	createCephObjectStore(s.T(), helper, k8sh, namespace, storeName, 3, tlsEnable, swiftAndKeystone)
 
 	// test that a second object store can be created (and deleted) while the first exists
 	s.T().Run("run a second object store", func(t *testing.T) {
@@ -155,7 +170,7 @@ func runObjectE2ETest(helper *clients.TestClient, k8sh *utils.K8sHelper, s suite
 	testObjectStoreOperations(s, helper, k8sh, namespace, storeName)
 
 	bucketNotificationTestStoreName := "bucket-notification-" + storeName
-	createCephObjectStore(s.T(), helper, k8sh, namespace, bucketNotificationTestStoreName, 1, tlsEnable)
+	createCephObjectStore(s.T(), helper, k8sh, namespace, bucketNotificationTestStoreName, 1, tlsEnable, false)
 	testBucketNotifications(s, helper, k8sh, namespace, bucketNotificationTestStoreName)
 }
 
